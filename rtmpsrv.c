@@ -98,6 +98,7 @@ STREAMING_SERVER *startStreaming(const char *address, int port);
 void stopStreaming(STREAMING_SERVER * server);
 void AVreplace(AVal *src, const AVal *orig, const AVal *repl);
 int SendCheckBWResponse(RTMP *r, int oldMethodType, int onBWDoneInit);
+AVal StripParams(AVal *src);
 
 static const AVal av_dquote = AVC("\"");
 static const AVal av_escdquote = AVC("\\\"");
@@ -667,6 +668,7 @@ ServeInvoke(STREAMING_SERVER *server, RTMP * r, RTMPPacket *packet, unsigned int
 	  argv[argc].av_val = ptr + 1;
 	  argv[argc++].av_len = 2;
 	  argv[argc].av_val = ptr + 5;
+	  r->Link.tcUrl = StripParams(&r->Link.tcUrl);
 	  ptr += sprintf(ptr," -r \"%s\"", r->Link.tcUrl.av_val);
 	  argv[argc++].av_len = r->Link.tcUrl.av_len;
 
@@ -691,6 +693,7 @@ ServeInvoke(STREAMING_SERVER *server, RTMP * r, RTMPPacket *packet, unsigned int
 	      argv[argc].av_val = ptr + 1;
 	      argv[argc++].av_len = 2;
 	      argv[argc].av_val = ptr + 5;
+	      r->Link.swfUrl = StripParams(&r->Link.swfUrl);
 	      ptr += sprintf(ptr, " -W \"%s\"", r->Link.swfUrl.av_val);
 	      argv[argc++].av_len = r->Link.swfUrl.av_len;
 	    }
@@ -1238,4 +1241,51 @@ AVreplace(AVal *src, const AVal *orig, const AVal *repl)
   *dptr = '\0';
   src->av_val = dest;
   src->av_len = dptr - dest;
+}
+
+AVal
+StripParams(AVal *src)
+{
+  AVal str;
+  if (src->av_val)
+    {
+      str.av_val = calloc(src->av_len + 1, sizeof (char));
+      strncpy(str.av_val, src->av_val, src->av_len);
+      str.av_len = src->av_len;
+      char *start = str.av_val;
+      char *end = start + str.av_len;
+      char *ptr = start;
+
+      while (ptr < end)
+        {
+          if (*ptr == '?')
+            {
+              str.av_len = ptr - start;
+              break;
+            }
+          ptr++;
+        }
+      memset(start + str.av_len, 0, 1);
+
+      char *dynamic = strstr(start, "[[DYNAMIC]]");
+      if (dynamic)
+        {
+          dynamic -= 1;
+          memset(dynamic, 0, 1);
+          str.av_len = dynamic - start;
+          end = start + str.av_len;
+        }
+
+      char *import = strstr(start, "[[IMPORT]]");
+      if (import)
+        {
+          str.av_val = import + 11;
+          strcpy(start, "http://");
+          str.av_val = strcat(start, str.av_val);
+          str.av_len = strlen(str.av_val);
+        }
+      return str;
+    }
+  str = *src;
+  return str;
 }
