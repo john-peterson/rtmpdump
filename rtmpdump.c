@@ -49,6 +49,7 @@
 #define RD_NO_CONNECT		3
 
 #define DEF_TIMEOUT	30	/* seconds */
+#define DEF_THROTTLE	0	/* disabled */
 #define DEF_BUFTIME	(10 * 60 * 60 * 1000)	/* 10 hours default */
 #define DEF_SKIPFRM	0
 
@@ -654,6 +655,9 @@ void usage(char *prog)
 	  RTMP_LogPrintf
 	    ("--protocol|-l num       Overrides the protocol in the rtmp url (0 - RTMP, 2 - RTMPE)\n");
 	  RTMP_LogPrintf
+	    ("--throttle|-H num       Throttle connection Kib/s (default: %u)\n",
+	     DEF_THROTTLE);
+	  RTMP_LogPrintf
 	    ("--playpath|-y path      Overrides the playpath parsed from rtmp url\n");
 	  RTMP_LogPrintf
 	    ("--playlist|-Y           Set playlist before playing\n");
@@ -755,6 +759,7 @@ main(int argc, char **argv)
   int port = -1;
   int protocol = RTMP_PROTOCOL_UNDEFINED;
   int retries = 0;
+  int throttle = 0;
   int bLiveStream = FALSE;	// is it a live stream? then we can't seek/resume
   int bRealtimeStream = FALSE;  // If true, disable the BUFX hack (be patient)
   int bHashes = FALSE;		// display byte counters not hashes by default
@@ -825,6 +830,7 @@ main(int argc, char **argv)
     {"port", 1, NULL, 'c'},
     {"socks", 1, NULL, 'S'},
     {"protocol", 1, NULL, 'l'},
+    {"throttle", 1, NULL, 'H'},
     {"playpath", 1, NULL, 'y'},
     {"playlist", 0, NULL, 'Y'},
     {"url", 1, NULL, 'i'},
@@ -863,7 +869,7 @@ main(int argc, char **argv)
 
   while ((opt =
 	  getopt_long(argc, argv,
-		      "hVveqzRr:s:t:i:p:a:b:f:o:u:C:n:c:l:y:Ym:k:d:A:B:T:w:x:W:X:S:#j:",
+		      "hVveqzRr:s:t:i:p:a:b:f:o:u:C:n:c:l:H:y:Ym:k:d:A:B:T:w:x:W:X:S:#j:",
 		      longopts, NULL)) != -1)
     {
       switch (opt)
@@ -1049,6 +1055,9 @@ main(int argc, char **argv)
 	case 'm':
 	  timeout = atoi(optarg);
 	  break;
+	case 'H':
+	  throttle = atoi(optarg);
+	  break;
 	case 'A':
 	  dStartOffset = (int) (atof(optarg) * 1000.0);
 	  break;
@@ -1196,7 +1205,7 @@ main(int argc, char **argv)
 
   if (!fullUrl.av_len)
     {
-      RTMP_SetupStream(&rtmp, protocol, &hostname, port, &sockshost, &playpath,
+      RTMP_SetupStream(&rtmp, protocol, &hostname, port, &sockshost, throttle, &playpath,
 		       &tcUrl, &swfUrl, &pageUrl, &app, &auth, &swfHash, swfSize,
 		       &flashVer, &subscribepath, &usherToken, dSeek, dStopOffset, bLiveStream, timeout);
     }

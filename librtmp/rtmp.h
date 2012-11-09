@@ -139,6 +139,17 @@ extern "C"
   int RTMPPacket_Alloc(RTMPPacket *p, int nSize);
   void RTMPPacket_Free(RTMPPacket *p);
 
+  // traffic queue for throttle
+  typedef struct traffic {
+    uint32_t time;
+    int traf;
+  } traffic;
+  typedef struct traffic_queue {
+    int size;
+    int len;
+    traffic *data;
+  } traffic_queue;
+  
 #define RTMPPacket_IsReady(a)	((a)->m_nBytesRead == (a)->m_nBodySize)
 
   typedef struct RTMP_LNK
@@ -177,6 +188,8 @@ extern "C"
 
     int protocol;
     int timeout;		/* connection timeout in seconds */
+    int throttle;
+    traffic_queue t_queue;
 
 #define RTMP_PUB_NAME   0x0001  /* send login to server */
 #define RTMP_PUB_RESP   0x0002  /* send salted password hash */
@@ -299,6 +312,7 @@ extern "C"
 			AVal *hostname,
 			unsigned int port,
 			AVal *sockshost,
+			int throttle,
 			AVal *playpath,
 			AVal *tcUrl,
 			AVal *swfUrl,

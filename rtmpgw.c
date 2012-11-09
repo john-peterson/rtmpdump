@@ -82,6 +82,7 @@ typedef struct
   int bLiveStream;		// is it a live stream? then we can't seek/resume
 
   long int timeout;		// timeout connection after 120 seconds
+  int throttle;
   uint32_t bufferTime;
 
   char *rtmpurl;
@@ -555,7 +556,7 @@ void processTCPrequest(STREAMING_SERVER * server,	// server socket and state (ou
   RTMP_SetBufferMS(&rtmp, req.bufferTime);
   if (!req.fullUrl.av_len)
     {
-      RTMP_SetupStream(&rtmp, req.protocol, &req.hostname, req.rtmpport, &req.sockshost,
+      RTMP_SetupStream(&rtmp, req.protocol, &req.hostname, req.rtmpport, &req.sockshost, req.throttle,
 		       &req.playpath, &req.tcUrl, &req.swfUrl, &req.pageUrl, &req.app, &req.auth, &req.swfHash, req.swfSize, &req.flashVer, &req.subscribepath, &req.usherToken, dSeek, req.dStopOffset,
 		       req.bLiveStream, req.timeout);
     }
@@ -947,6 +948,9 @@ ParseOption(char opt, char *arg, RTMP_REQUEST * req)
     case 'm':
       req->timeout = atoi(arg);
       break;
+    case 'H':
+       req->throttle = atoi(arg);
+      break;
     case 'A':
       req->dStartOffset = (int)(atof(arg) * 1000.0);
       //printf("dStartOffset = %d\n", dStartOffset);
@@ -997,6 +1001,7 @@ main(int argc, char **argv)
   memset(&defaultRTMPRequest, 0, sizeof(RTMP_REQUEST));
 
   defaultRTMPRequest.rtmpport = -1;
+  defaultRTMPRequest.throttle = 0;  // don't throttle
   defaultRTMPRequest.protocol = RTMP_PROTOCOL_UNDEFINED;
   defaultRTMPRequest.bLiveStream = FALSE;	// is it a live stream? then we can't seek/resume
 
@@ -1013,6 +1018,7 @@ main(int argc, char **argv)
     {"port", 1, NULL, 'c'},
     {"socks", 1, NULL, 'S'},
     {"protocol", 1, NULL, 'l'},
+    {"throttle", 1, NULL, 'H'},
     {"playpath", 1, NULL, 'y'},
     {"rtmp", 1, NULL, 'r'},
     {"swfUrl", 1, NULL, 's'},
@@ -1056,7 +1062,7 @@ main(int argc, char **argv)
 
   while ((opt =
 	  getopt_long(argc, argv,
-		      "hvqVzr:s:t:i:p:a:f:u:n:c:l:y:m:d:D:A:B:T:g:w:x:W:X:S:j:", longopts,
+		      "hvqVzr:s:t:i:p:a:f:u:n:c:l:H:y:m:d:D:A:B:T:g:w:x:W:X:S:j:", longopts,
 		      NULL)) != -1)
     {
       switch (opt)
@@ -1077,6 +1083,9 @@ main(int argc, char **argv)
 	    ("--socks|-S host:port    Use the specified SOCKS proxy\n");
 	  RTMP_LogPrintf
 	    ("--protocol|-l           Overrides the protocol in the rtmp url (0 - RTMP, 2 - RTMPE)\n");
+	  RTMP_LogPrintf
+	    ("--throttle|-H num       Throttle connection Kib/s (default: %d)\n",
+	     defaultRTMPRequest.throttle);
 	  RTMP_LogPrintf
 	    ("--playpath|-y           Overrides the playpath parsed from rtmp url\n");
 	  RTMP_LogPrintf("--swfUrl|-s url         URL to player swf file\n");
