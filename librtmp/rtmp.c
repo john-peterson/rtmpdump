@@ -68,6 +68,7 @@ TLS_CTX RTMP_TLS_ctx;
 
 #define RTMP_SIG_SIZE 1536
 #define RTMP_LARGE_HEADER_SIZE 12
+#define IO_TRAFFIC_HIST 10 // s
 
 static const int packetSize[] = { 12, 8, 4, 1 };
 
@@ -149,6 +150,30 @@ static int clk_tck;
 #ifdef CRYPTO
 #include "handshake.h"
 #endif
+
+// traffic history for input throttle
+static void t_queue_push(traffic_queue *queue, int64_t time, int traf)
+{
+    traffic* data;
+    queue->len++;
+    data = realloc(queue->data, sizeof(traffic)*queue->len);
+    if (!data)
+        return;
+    queue->data = data;
+    queue->data[queue->len-1].time = time;
+    queue->data[queue->len-1].traf = traf;
+}
+
+static void t_queue_pop(traffic_queue *queue)
+{
+    int i;
+    for (i = 0; i < queue->len; i++)  {
+        if (queue->data[i].time < RTMP_GetTime()-IO_TRAFFIC_HIST*1000) {
+            memmove(queue->data + i, queue->data + i + 1, sizeof(traffic)*(queue->len - i - 1));
+            queue->len--;
+        }
+    }
+}
 
 uint32_t
 RTMP_GetTime()
@@ -432,6 +457,7 @@ RTMP_SetupStream(RTMP *r,
 		 AVal *host,
 		 unsigned int port,
 		 AVal *sockshost,
+		 int throttle,
 		 AVal *playpath,
 		 AVal *tcUrl,
 		 AVal *swfUrl,
@@ -518,6 +544,7 @@ RTMP_SetupStream(RTMP *r,
   if (bLiveStream)
     r->Link.lFlags |= RTMP_LF_LIVE;
   r->Link.timeout = timeout;
+  r->Link.throttle = throttle;
 
   r->Link.protocol = protocol;
   r->Link.hostname = *host;
@@ -1381,6 +1408,33 @@ extern FILE *netstackdump;
 extern FILE *netstackdump_read;
 #endif
 
+// input throttle
+static int64_t ThrottleRate(traffic_queue *queue, int64_t time)
+{
+    int64_t sum = 0;
+    int i;
+    for (i = 0; i < queue->len; i++) {
+        if (queue->data[i].time > RTMP_GetTime()-time)
+            sum += queue->data[i].traf;
+    }
+    return (double)sum/((double)time/1000.0); // B/s
+}
+
+static int Throttle(RTMP *r, traffic_queue *queue)
+{
+    if (!r->Link.throttle) return 0;
+    t_queue_pop(&r->Link.t_queue);
+    // measure speed at multiple intervals to create an even transfer rate
+    if (ThrottleRate(&r->Link.t_queue, 0.001*1000) > r->Link.throttle*0x80
+        || ThrottleRate(&r->Link.t_queue, 0.01*1000) > r->Link.throttle*0x80
+        || ThrottleRate(&r->Link.t_queue, 0.1*1000) > r->Link.throttle*0x80
+        || ThrottleRate(&r->Link.t_queue, 1*1000) > r->Link.throttle*0x80
+        || ThrottleRate(&r->Link.t_queue, 10*1000) > r->Link.throttle*0x80
+        )
+    return 1;
+    return 0;
+}
+
 static int
 ReadN(RTMP *r, char *buffer, int n)
 {
@@ -1458,8 +1512,15 @@ ReadN(RTMP *r, char *buffer, int n)
 	  r->m_sb.sb_size -= nRead;
 	  nBytes = nRead;
 	  r->m_nBytesIn += nRead;
+	  
+	  // throttle
+	  t_queue_push(&r->Link.t_queue, RTMP_GetTime(), nRead);
+	  while (r->Link.throttle && Throttle(r, &r->Link.t_queue)) {
+        usleep(0.1*1000000);
+	  }
+        
 	  if (r->m_bSendCounter
-	      && r->m_nBytesIn > ( r->m_nBytesInSent + r->m_nClientBW / 10))
+	      && r->m_nBytesIn > r->m_nBytesInSent && r->m_nBytesIn > 10000)
 	    if (!SendBytesReceived(r))
 	        return FALSE;
 	}
