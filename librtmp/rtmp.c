@@ -3323,7 +3323,12 @@ DumpMetaData(AMFObject *obj)
   for (n = 0; n < obj->o_num; n++)
     {
       prop = AMF_GetProp(obj, NULL, n);
-      if (prop->p_type != AMF_OBJECT)
+      if
+        (
+          prop->p_type != AMF_OBJECT &&
+          prop->p_type != AMF_ECMA_ARRAY &&
+          prop->p_type != AMF_STRICT_ARRAY
+        )
 	{
 	  char str[256] = "";
 	  switch (prop->p_type)
