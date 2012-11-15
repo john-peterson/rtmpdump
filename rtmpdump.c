@@ -792,12 +792,12 @@ main(int argc, char **argv)
 
   char *flvFile = 0;
 
-   signal(SIGINT, sigIntHandler);
-   signal(SIGTERM, sigIntHandler);
+   //signal(SIGINT, sigIntHandler);
+   //signal(SIGTERM, sigIntHandler);
 #ifndef WIN32
-   signal(SIGHUP, sigIntHandler);
-   signal(SIGPIPE, sigIntHandler);
-   signal(SIGQUIT, sigIntHandler);
+   //signal(SIGHUP, sigIntHandler);
+   //signal(SIGPIPE, sigIntHandler);
+   //signal(SIGQUIT, sigIntHandler);
 #endif
 
   RTMP_debuglevel = RTMP_LOGINFO;
