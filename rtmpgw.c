@@ -78,6 +78,7 @@ typedef struct
 {
   AVal hostname;
   int rtmpport;
+  int packet_size;
   int protocol;
   int bLiveStream;		// is it a live stream? then we can't seek/resume
 
@@ -556,7 +557,7 @@ void processTCPrequest(STREAMING_SERVER * server,	// server socket and state (ou
   RTMP_SetBufferMS(&rtmp, req.bufferTime);
   if (!req.fullUrl.av_len)
     {
-      RTMP_SetupStream(&rtmp, req.protocol, &req.hostname, req.rtmpport, &req.sockshost, req.throttle,
+      RTMP_SetupStream(&rtmp, req.protocol, &req.hostname, req.rtmpport, &req.sockshost, req.throttle, req.packet_size,
 		       &req.playpath, &req.tcUrl, &req.swfUrl, &req.pageUrl, &req.app, &req.auth, &req.swfHash, req.swfSize, &req.flashVer, &req.subscribepath, &req.usherToken, dSeek, req.dStopOffset,
 		       req.bLiveStream, req.timeout);
     }
@@ -885,6 +886,9 @@ ParseOption(char opt, char *arg, RTMP_REQUEST * req)
 	  }
 	break;
       }
+    case 'P':
+       req->packet_size = atoi(arg) * 0x80; // Kib to B
+      break;
     case 'y':
       STR2AVAL(req->playpath, arg);
       break;
@@ -1019,6 +1023,7 @@ main(int argc, char **argv)
     {"socks", 1, NULL, 'S'},
     {"protocol", 1, NULL, 'l'},
     {"throttle", 1, NULL, 'H'},
+    {"packet_size", 1, NULL, 'P'},
     {"playpath", 1, NULL, 'y'},
     {"rtmp", 1, NULL, 'r'},
     {"swfUrl", 1, NULL, 's'},
@@ -1062,7 +1067,7 @@ main(int argc, char **argv)
 
   while ((opt =
 	  getopt_long(argc, argv,
-		      "hvqVzr:s:t:i:p:a:f:u:n:c:l:H:y:m:d:D:A:B:T:g:w:x:W:X:S:j:", longopts,
+		      "hvqVzr:s:t:i:p:a:f:u:n:c:l:H:P:y:m:d:D:A:B:T:g:w:x:W:X:S:j:", longopts,
 		      NULL)) != -1)
     {
       switch (opt)
@@ -1086,6 +1091,9 @@ main(int argc, char **argv)
 	  RTMP_LogPrintf
 	    ("--throttle|-H num       Throttle connection Kib/s (default: %d)\n",
 	     defaultRTMPRequest.throttle);
+	  RTMP_LogPrintf
+	    ("--packet_size|-P        Max input TCP packet size in Kib (default: %u)\n",
+	     RTMP_BUFFER_SIZE/0x80);
 	  RTMP_LogPrintf
 	    ("--playpath|-y           Overrides the playpath parsed from rtmp url\n");
 	  RTMP_LogPrintf("--swfUrl|-s url         URL to player swf file\n");

@@ -60,8 +60,8 @@ extern "C"
 
 #define RTMP_DEFAULT_CHUNKSIZE	128
 
-/* needs to fit largest number of bytes recv() may return */
-#define RTMP_BUFFER_CACHE_SIZE (16*1024)
+/* max TCP packet size */
+#define RTMP_BUFFER_SIZE (16*1024)
 
 #define	RTMP_CHANNELS	65600
 
@@ -129,9 +129,10 @@ extern "C"
     int sb_socket;
     int sb_size;		/* number of unprocessed bytes in buffer */
     char *sb_start;		/* pointer into sb_pBuffer of next byte to process */
-    char sb_buf[RTMP_BUFFER_CACHE_SIZE];	/* data read from socket */
+    char *sb_buf;	    /* data read from socket */
     int sb_timedout;
     void *sb_ssl;
+	int sb_buf_size;    /* max packet size */
   } RTMPSockBuf;
 
   void RTMPPacket_Reset(RTMPPacket *p);
@@ -313,6 +314,7 @@ extern "C"
 			unsigned int port,
 			AVal *sockshost,
 			int throttle,
+			unsigned int packet_size,
 			AVal *playpath,
 			AVal *tcUrl,
 			AVal *swfUrl,
