@@ -458,6 +458,7 @@ RTMP_SetupStream(RTMP *r,
 		 unsigned int port,
 		 AVal *sockshost,
 		 int throttle,
+		 unsigned int packet_size,
 		 AVal *playpath,
 		 AVal *tcUrl,
 		 AVal *swfUrl,
@@ -517,6 +518,10 @@ RTMP_SetupStream(RTMP *r,
 #endif
 
   SocksSetup(r, sockshost);
+  if (packet_size)
+    r->m_sb.sb_buf_size = packet_size;
+  else
+    r->m_sb.sb_buf_size = RTMP_BUFFER_SIZE;
 
   if (tcUrl && tcUrl->av_len)
     r->Link.tcUrl = *tcUrl;
@@ -1560,7 +1565,7 @@ WriteN(RTMP *r, const char *buffer, int n)
   const char *ptr = buffer;
 #ifdef CRYPTO
   char *encrypted = 0;
-  char buf[RTMP_BUFFER_CACHE_SIZE];
+  char buf[RTMP_BUFFER_SIZE];
 
   if (r->Link.rc4keyOut)
     {
@@ -4309,12 +4314,14 @@ RTMPSockBuf_Fill(RTMPSockBuf *sb)
 {
   int nBytes;
 
+  sb->sb_buf = malloc(sb->sb_buf_size);
+
   if (!sb->sb_size)
     sb->sb_start = sb->sb_buf;
 
   while (1)
     {
-      nBytes = sizeof(sb->sb_buf) - 1 - sb->sb_size - (sb->sb_start - sb->sb_buf);
+      nBytes = sb->sb_buf_size - 1 - sb->sb_size - (sb->sb_start - sb->sb_buf);
 #if defined(CRYPTO) && !defined(NO_SSL)
       if (sb->sb_ssl)
 	{

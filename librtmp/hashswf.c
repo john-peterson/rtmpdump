@@ -88,6 +88,7 @@ HTTP_get(struct HTTP_ctx *http, const char *url, HTTP_read_callback *cb)
   HTTPResult ret = HTTPRES_OK;
   struct sockaddr_in sa;
   RTMPSockBuf sb = {0};
+  sb.sb_buf = malloc(sb.sb_buf_size);
 
   http->status = -1;
 

@@ -658,6 +658,9 @@ void usage(char *prog)
 	    ("--throttle|-H num       Throttle connection Kib/s (default: %u)\n",
 	     DEF_THROTTLE);
 	  RTMP_LogPrintf
+	    ("--packet_size|-P        Max input TCP packet size in Kib (default: %u)\n",
+	     RTMP_BUFFER_SIZE/0x80);
+	  RTMP_LogPrintf
 	    ("--playpath|-y path      Overrides the playpath parsed from rtmp url\n");
 	  RTMP_LogPrintf
 	    ("--playlist|-Y           Set playlist before playing\n");
@@ -757,6 +760,7 @@ main(int argc, char **argv)
   AVal subscribepath = { 0, 0 };
   AVal usherToken = { 0, 0 }; //Justin.tv auth token
   int port = -1;
+  int packet_size = RTMP_BUFFER_SIZE;
   int protocol = RTMP_PROTOCOL_UNDEFINED;
   int retries = 0;
   int throttle = 0;
@@ -788,12 +792,12 @@ main(int argc, char **argv)
 
   char *flvFile = 0;
 
-  signal(SIGINT, sigIntHandler);
-  signal(SIGTERM, sigIntHandler);
+   signal(SIGINT, sigIntHandler);
+   signal(SIGTERM, sigIntHandler);
 #ifndef WIN32
-  signal(SIGHUP, sigIntHandler);
-  signal(SIGPIPE, sigIntHandler);
-  signal(SIGQUIT, sigIntHandler);
+   signal(SIGHUP, sigIntHandler);
+   signal(SIGPIPE, sigIntHandler);
+   signal(SIGQUIT, sigIntHandler);
 #endif
 
   RTMP_debuglevel = RTMP_LOGINFO;
@@ -831,6 +835,7 @@ main(int argc, char **argv)
     {"socks", 1, NULL, 'S'},
     {"protocol", 1, NULL, 'l'},
     {"throttle", 1, NULL, 'H'},
+    {"packet_size", 1, NULL, 'P'},
     {"playpath", 1, NULL, 'y'},
     {"playlist", 0, NULL, 'Y'},
     {"url", 1, NULL, 'i'},
@@ -869,7 +874,7 @@ main(int argc, char **argv)
 
   while ((opt =
 	  getopt_long(argc, argv,
-		      "hVveqzRr:s:t:i:p:a:b:f:o:u:C:n:c:l:H:y:Ym:k:d:A:B:T:w:x:W:X:S:#j:",
+		      "hVveqzRr:s:t:i:p:a:b:f:o:u:C:n:c:l:H:P:y:Ym:k:d:A:B:T:w:x:W:X:S:#j:",
 		      longopts, NULL)) != -1)
     {
       switch (opt)
@@ -973,6 +978,9 @@ main(int argc, char **argv)
 	      RTMP_Log(RTMP_LOGERROR, "Unknown protocol specified: %d", protocol);
 	      return RD_FAILED;
 	    }
+	  break;
+	case 'P':
+	  packet_size = atoi(optarg) * 0x80; // Kib to B
 	  break;
 	case 'y':
 	  STR2AVAL(playpath, optarg);
@@ -1205,7 +1213,7 @@ main(int argc, char **argv)
 
   if (!fullUrl.av_len)
     {
-      RTMP_SetupStream(&rtmp, protocol, &hostname, port, &sockshost, throttle, &playpath,
+      RTMP_SetupStream(&rtmp, protocol, &hostname, port, &sockshost, throttle, packet_size, &playpath,
 		       &tcUrl, &swfUrl, &pageUrl, &app, &auth, &swfHash, swfSize,
 		       &flashVer, &subscribepath, &usherToken, dSeek, dStopOffset, bLiveStream, timeout);
     }
